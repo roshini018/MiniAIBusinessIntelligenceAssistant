@@ -1,4 +1,33 @@
+# Python
 venv/
-.env
-*.db
+.venv/
 __pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment and sensitive files
+.env
+.env.local
+*.pem
+*.key
+.env.*
+!.env.example
+
+# SQLite Database
+*.db
+*.db-journal
+*.sqlite3
+data/*.db
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
