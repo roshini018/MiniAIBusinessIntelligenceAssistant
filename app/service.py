@@ -12,21 +12,17 @@ SUPPORTED = [
     "top region by revenue",
     "revenue comparison between two months",
 ]
-
 UNSUPPORTED_MESSAGE = (
-    "I can't answer that question. I am designed to assist with these 5 specific business intelligence metrics:\n"
-    "1. Total revenue (e.g., 'What is our total revenue?')\n"
-    "2. Top product by revenue (e.g., 'Which product earned the most revenue?')\n"
-    "3. Monthly revenue trend (e.g., 'Show monthly revenue trends')\n"
-    "4. Top region by revenue (e.g., 'Which region had the highest sales?')\n"
-    "5. Revenue comparison between two months (e.g., 'Compare revenue between April and May 2026')\n\n"
-    "Please try rephrasing your question using one of these supported question types."
+    "I can't answer that question. Supported questions include: "
+    "Total revenue, Top product by revenue, Top region by revenue, "
+    "Monthly revenue trend, and Revenue comparison between two months. "
+    "You can also ask about specific products, regions, months, rankings, "
+    "or highest and lowest performers."
 )
-
 
 def answer_question(
     question: str,
-    db_path: str = DEFAULT_DB_PATH,
+    db_path: str | None = None,
     classifier=classify_question,
 ) -> dict:
     question = (question or "").strip()
@@ -37,7 +33,8 @@ def answer_question(
             f"Question is too long (max {MAX_QUESTION_LENGTH} characters).", 400
         )
 
-    conn = queries.get_conn(db_path)
+    target_db = db_path if db_path is not None else queries.DEFAULT_DB_PATH
+    conn = queries.get_conn(target_db)
 
     try:
         default_year = _latest_year(conn)
@@ -47,11 +44,22 @@ def answer_question(
         if intent == "total_revenue":
             result = queries.total_revenue(conn)
         elif intent == "top_product":
-            result = queries.top_product(conn)
+            target = decision.get("params", {}).get("target")
+            product = decision.get("params", {}).get("product")
+            if target == "specific":
+                product = queries.find_product(conn, question) or (queries.find_product(conn, product) if product else None) or product
+            result = queries.top_product(conn, target=target, product_name=product)
         elif intent == "monthly_trend":
-            result = queries.monthly_trend(conn)
+            target = decision.get("params", {}).get("target")
+            months = decision.get("params", {}).get("months", [])
+            month = decision.get("params", {}).get("month") or (months[0] if (target == "specific" and months) else None)
+            result = queries.monthly_trend(conn, target=target, month=month)
         elif intent == "top_region":
-            result = queries.top_region(conn)
+            target = decision.get("params", {}).get("target")
+            region = decision.get("params", {}).get("region")
+            if target == "specific":
+                region = queries.find_region(conn, question) or (queries.find_region(conn, region) if region else None) or region
+            result = queries.top_region(conn, target=target, region_name=region)
         elif intent == "month_comparison":
             months = decision.get("params", {}).get("months", [])
             if len(months) != 2:
@@ -63,6 +71,11 @@ def answer_question(
             if months[0] == months[1]:
                 raise AppError("Please name two distinct months to compare.", 400)
             result = queries.month_comparison(conn, months[0], months[1])
+        elif intent == "ambiguous":
+            msg = decision.get("params", {}).get("message") or (
+                "Please clarify whether you would like to see the highest/lowest performance by month, product, or region."
+            )
+            raise AppError(msg, 400)
         else:
             raise AppError(UNSUPPORTED_MESSAGE, 422)
     except AppError:

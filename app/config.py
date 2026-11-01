@@ -22,5 +22,6 @@ ALLOWED_INTENTS = {
     "monthly_trend",
     "top_region",
     "month_comparison",
+    "ambiguous",
     "unsupported",
 }
