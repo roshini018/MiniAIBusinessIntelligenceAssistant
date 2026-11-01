@@ -4,13 +4,27 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-
+from pathlib import Path
+from app.data_loader import load_to_db
+from app.config import DEFAULT_DB_PATH
 from app import queries
 from app.queries import AppError
 from app.service import answer_question
 
 logger = logging.getLogger("bi-assistant")
+def initialize_database():
+    db_path = Path(DEFAULT_DB_PATH)
+
+    if not db_path.exists():
+        logger.info("Database not found. Creating it from sales.csv...")
+        report = load_to_db()
+        logger.info("Database initialized: %s", report)
+    else:
+        logger.info("Database already exists.")
 app = FastAPI(title="Mini AI BI Assistant")
+@app.on_event("startup")
+def startup_event():
+    initialize_database()
 
 app.add_middleware(
     CORSMiddleware,
